@@ -5,7 +5,12 @@ const compression = require('compression');
 const http = require('http');
 const authRoutes = require('./routes/authRoutes');
 const companyRoutes = require('./routes/companyRoutes');
+const connectDB = require('./config/db');
 const errorHandler = require('./utils/errorHandler');
+
+// Connect to database
+connectDB();
+
 const app = express();
 require('dotenv').config();
 require('dotenv').config({ path: './sendgrid.env' });

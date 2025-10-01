@@ -8,7 +8,7 @@ async function createCompany(req, res, next) {
     if (!company_name || !address || !city || !state || !country || !postal_code || !industry) {
       return res.status(400).json({ success: false, message: 'Missing required company fields.' });
     }
-    const companyId = await dbService.createCompanyProfile({
+    const newCompanyProfile = await dbService.createCompanyProfile({
       owner_id,
       company_name,
       address,
@@ -22,12 +22,12 @@ async function createCompany(req, res, next) {
       industry,
       founded_date,
       description,
-      social_links: social_links ? JSON.stringify(social_links) : null,
+      social_links: social_links || null,
     });
     res.status(201).json({
       success: true,
       message: 'Company profile created successfully',
-      data: { companyId },
+      data: { companyProfile: newCompanyProfile },
     });
   } catch (error) {
     next({ status: 500, message: 'Error creating company profile', error });

@@ -1,107 +1,67 @@
-const pool = require('../config/db');
+const User = require('../models/User');
+const CompanyProfile = require('../models/CompanyProfile');
+const Otp = require('../models/Otp');
 
 // --- User Functions ---
 
 async function getUserByEmail(email) {
-  const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
-  return rows[0];
+  return User.findOne({ email });
 }
 
 async function getUserByMobile(mobileNumber) {
-  const [rows] = await pool.query('SELECT * FROM users WHERE mobile_no = ?', [mobileNumber]);
-  return rows[0];
+  return User.findOne({ mobile_no: mobileNumber });
 }
 
 async function getUserById(userId) {
-  const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [userId]);
-  return rows[0];
+  return User.findById(userId);
 }
 
 async function createUser(userData) {
-  const fields = Object.keys(userData);
-  const values = Object.values(userData);
-  const placeholders = fields.map(() => '?').join(', ');
-
-  const [result] = await pool.query(
-    `INSERT INTO users (${fields.join(', ')}) VALUES (${placeholders})`,
-    values
-  );
-  return result.insertId;
+  const user = new User(userData);
+  await user.save();
+  return user; // Returning the full user object is more idiomatic for Mongoose
 }
 
 async function updateUser(userId, updates) {
-    const allowedFields = ['is_email_verified', 'email_otp', 'email_otp_expires', 'is_mobile_verified'];
-    
-    const fieldsToUpdate = Object.keys(updates)
-      .filter(key => allowedFields.includes(key) && updates[key] !== undefined);
-  
-    if (fieldsToUpdate.length === 0) {
-      return; // No valid fields to update
-    }
-  
-    const setClauses = fieldsToUpdate.map(field => `${field} = ?`);
-    const values = fieldsToUpdate.map(field => updates[field]);
-  
-    const sql = `UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`;
-    await pool.query(sql, [...values, userId]);
+  // Mongoose's findByIdAndUpdate by default returns the document *before* the update.
+  // Use { new: true } to return the updated document.
+  return User.findByIdAndUpdate(userId, updates, { new: true });
 }
 
 // --- Company Profile Functions ---
 
 async function getCompanyProfileByOwnerId(ownerId) {
-  const [rows] = await pool.query('SELECT * FROM companyProfile WHERE owner_id = ?', [ownerId]);
-  return rows[0];
+  return CompanyProfile.findOne({ owner_id: ownerId });
 }
 
 async function updateCompanyProfile(ownerId, updates) {
-  const allowedFields = ['company_name', 'address', 'city', 'state', 'country', 'postal_code', 'website', 'logo_url', 'banner_url', 'industry', 'founded_date', 'description', 'social_links'];
-  
-  const fieldsToUpdate = Object.keys(updates)
-    .filter(key => allowedFields.includes(key) && updates[key] !== null && updates[key] !== undefined);
-
-  if (fieldsToUpdate.length === 0) {
-    return; // No valid fields to update
-  }
-
-  const setClauses = fieldsToUpdate.map(field => `${field} = ?`);
-  const values = fieldsToUpdate.map(field => updates[field]);
-
-  const sql = `UPDATE companyProfile SET ${setClauses.join(', ')} WHERE owner_id = ?`;
-  await pool.query(sql, [...values, ownerId]);
+  return CompanyProfile.findOneAndUpdate({ owner_id: ownerId }, updates, { new: true });
 }
 
 async function createCompanyProfile(profileData) {
-  const filteredProfileData = Object.fromEntries(Object.entries(profileData).filter(([_, v]) => v !== undefined && v !== null));
-  const fields = Object.keys(filteredProfileData);
-  const values = Object.values(filteredProfileData);
-  const placeholders = fields.map(() => '?').join(', ');
-  const [result] = await pool.query(
-    `INSERT INTO companyProfile (${fields.join(', ')}) VALUES (${placeholders})`,
-    values
-  );
-  return result.insertId;
+  const profile = new CompanyProfile(profileData);
+  await profile.save();
+  return profile;
 }
 
 // --- OTP Functions ---
 
 async function createOrUpdateOtp(email, otp, expires_at) {
-    const sql = `
-        INSERT INTO otp_verifications (email, otp, expires_at)
-        VALUES (?, ?, ?)
-        ON DUPLICATE KEY UPDATE otp = ?, expires_at = ?;
-    `;
-    await pool.query(sql, [email, otp, expires_at, otp, expires_at]);
+  // Use findOneAndUpdate with upsert to either create a new OTP or update an existing one.
+  return Otp.findOneAndUpdate(
+    { email },
+    { otp, expires_at },
+    { upsert: true, new: true }
+  );
 }
 
 async function getOtpByEmail(email) {
-    const [rows] = await pool.query('SELECT * FROM otp_verifications WHERE email = ?', [email]);
-    return rows[0];
+  return Otp.findOne({ email });
 }
 
 async function deleteOtp(email) {
-    await pool.query('DELETE FROM otp_verifications WHERE email = ?', [email]);
+  return Otp.deleteOne({ email });
 }
-
 
 module.exports = {
   getUserByEmail,
@@ -112,8 +72,6 @@ module.exports = {
   createCompanyProfile,
   getCompanyProfileByOwnerId,
   updateCompanyProfile,
-
-  // OTP functions
   createOrUpdateOtp,
   getOtpByEmail,
   deleteOtp,

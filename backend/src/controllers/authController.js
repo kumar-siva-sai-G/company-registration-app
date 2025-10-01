@@ -62,7 +62,7 @@ async function register(req, res, next) {
             return res.status(409).json({ message: 'Email already in use' });
         }
         const hashedPassword = await bcrypt.hash(password, 10);
-        const userId = await dbService.createUser({
+        const newUser = await dbService.createUser({
             email,
             password: hashedPassword,
             full_name,
@@ -73,7 +73,7 @@ async function register(req, res, next) {
             is_mobile_verified: false, // Mobile is not verified yet
         });
         if (company_name) {
-            await dbService.createCompanyProfile({ owner_id: userId, company_name, industry, address, city, state, country, postal_code });
+            await dbService.createCompanyProfile({ owner_id: newUser._id, company_name, industry, address, city, state, country, postal_code });
         }
         
         // Automatically send the first mobile OTP after registration
@@ -83,7 +83,7 @@ async function register(req, res, next) {
         res.status(201).json({
             success: true,
             message: "Registration successful. An OTP has been sent to your mobile for verification.",
-            data: { userId }
+            data: { userId: newUser._id }
         });
     } catch (error) {
         if (error.name === 'TokenExpiredError') {
@@ -110,7 +110,7 @@ async function verifyMobileController(req, res, next) {
             return res.status(404).json({ message: 'User not found for this mobile number.' });
         }
 
-        await dbService.updateUser(user.id, { is_mobile_verified: true });
+        await dbService.updateUser(user._id, { is_mobile_verified: true });
 
         res.status(200).json({ success: true, message: 'Mobile number verified successfully.' });
 
@@ -147,7 +147,7 @@ async function login(req, res, next) {
             return res.status(401).json({ message: 'Invalid credentials.' });
         }
 
-        const token = jwt.generateToken({ userId: user.id, email: user.email });
+        const token = jwt.generateToken({ userId: user._id, email: user.email });
 
         res.status(200).json({
             success: true,
@@ -155,7 +155,7 @@ async function login(req, res, next) {
             token,
             data: {
                 user: {
-                    id: user.id,
+                    id: user._id,
                     full_name: user.full_name,
                     email: user.email,
                     mobile_no: user.mobile_no,
