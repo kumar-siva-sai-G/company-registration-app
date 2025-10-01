@@ -24,3 +24,4 @@ lerna-debug.log*
 # Other
 .DS_Store
 /uploads
+backend/firebase-service-account.json
